@@ -95,6 +95,16 @@ def silent_telemetry(monkeypatch):
     monkeypatch.setattr(TelemetryLogger, "_write_to_db", _noop)
 
 
+@pytest.fixture(autouse=True)
+def isolate_action_firewall_audit(tmp_path, monkeypatch):
+    """Keep action.firewall audit records out of the developer's ./logs."""
+    from app.core.config import get_settings
+
+    path = tmp_path / "action_firewall_audit.jsonl"
+    monkeypatch.setattr(get_settings().defense, "action_firewall_audit_path", str(path))
+    return path
+
+
 @pytest_asyncio.fixture(autouse=True)
 async def clear_lab_runtime_state():
     """Undo in-memory halts and any synthetic lab impact between tests."""

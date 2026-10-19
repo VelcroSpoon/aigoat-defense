@@ -7,6 +7,7 @@ are registered in ``app.defense.controls`` and listed in
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from app.defense.chain import run_chain
 from app.defense.control import ControlAction, DefenseDecision, DefenseStage, get_control
@@ -57,6 +58,7 @@ class DefensePipeline:
         level: int,
         user_id: int | None = None,
         surface: str = "chat.cracky",
+        context: dict[str, Any] | None = None,
     ) -> PipelineResult:
         if level == 0:
             return PipelineResult(allowed=True, message=message)
@@ -67,6 +69,7 @@ class DefensePipeline:
             stage=DefenseStage.INPUT,
             payload=message,
             level=level,
+            context=context or {},
             user_id=user_id,
         )
         chain = await run_chain(_input_control_ids(profile), decision)
@@ -105,7 +108,14 @@ class DefensePipeline:
             outcomes=chain.outcomes,
         )
 
-    async def moderate_output(self, response: str, level: int, surface: str = "chat.cracky") -> str:
+    async def moderate_output(
+        self,
+        response: str,
+        level: int,
+        surface: str = "chat.cracky",
+        user_id: int | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> str:
         if level == 0:
             return response
         profile = resolve_profile(surface, level)
@@ -114,6 +124,8 @@ class DefensePipeline:
             stage=DefenseStage.OUTPUT,
             payload=response,
             level=level,
+            context=context or {},
+            user_id=user_id,
         )
         chain = await run_chain(_output_control_ids(profile), decision)
         changed = chain.final.payload != response or any(

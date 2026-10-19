@@ -256,7 +256,12 @@ async def chat_stream(
         moderated = full_reply
         replaced = False
         if level >= 1:
-            moderated = await defense_pipeline.moderate_output(full_reply, level)
+            moderated = await defense_pipeline.moderate_output(
+                full_reply,
+                level,
+                user_id=prepared.get("user_id"),
+                context={"actor": prepared.get("actor")},
+            )
             if moderated != full_reply:
                 replaced = True
         if level >= 2:
