@@ -69,6 +69,7 @@ class OrderFacts:
 class ActorContext:
     user_id: int
     username: str
+    email: str
     is_staff: bool
     orders: Mapping[str, OrderFacts]  # every id a user might type for an order they own
     coupons: Mapping[str, str]  # upper-case code -> target_audience
@@ -92,6 +93,7 @@ def build_actor(user: Any, orders: Iterable[Any], coupons: Iterable[Any]) -> Act
     return ActorContext(
         user_id=user.id,
         username=user.username,
+        email=(user.email or "").lower(),
         is_staff=bool(user.is_staff),
         orders=own,
         coupons={c.code.upper(): c.target_audience for c in coupons},
@@ -110,6 +112,7 @@ class DetectedAction:
     scope: str = ""  # export: "self" or "all"
     new_status: str = ""
     subject: str = ""  # data_access: whose data ("*" = everyone)
+    emails: tuple[str, ...] = ()  # data_access: personal email addresses mentioned
 
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
@@ -120,11 +123,16 @@ _ORDER_ID = re.compile(
     r"|#(\d{3,})\b",
     re.I,
 )
+# In a refund or status sentence, a bare number like "refund 1003" is an order id too.
+_BARE_NUMBER = re.compile(r"(?<![$.,\d])\b\d{3,}\b")
 _AMOUNT = re.compile(r"\$\s?(\d[\d,]*(?:\.\d{1,2})?)")
 _REFUND = re.compile(r"\brefund", re.I)
 _COUPON_WORD = re.compile(r"\b(?:coupon|promo|discount|voucher|code)\b|\bappl", re.I)
 _CODE = re.compile(r"\b[a-z]{3,}\d{1,4}\b", re.I)
 _EXPORT = re.compile(r"\bexport", re.I)
+_EXPORT_TARGET = re.compile(
+    r"\b(?:customer|user|account|order|personal|profile|data|record|e-?mail|database)s?\b", re.I
+)
 _EXPORT_ALL = re.compile(r"\b(?:all|every|entire|bulk|customers|users|database)\b", re.I)
 _EXPORT_SELF = re.compile(r"\b(?:my|mine|own|your)\b", re.I)
 _STATUS_CHANGE = re.compile(
@@ -145,12 +153,24 @@ _BULK_DATA = re.compile(
     r"(?:data|records?|details|info\w*|emails?|orders?|accounts?|list)\b",
     re.I,
 )
+# "every user" + a hand-over verb, e.g. "send me a CSV of every user".
+_EVERYONE = re.compile(r"\b(?:all|every|each|other)\s+(?:the\s+)?(?:customer|user|account|member)s?\b", re.I)
+_DATA_VERB = re.compile(r"\b(?:send|give|list|show|display|export|dump|download|share|print|csv|json|spreadsheet)\b", re.I)
 _ORDERS_FOR = re.compile(r"\borders?\s+(?:for|of|belonging\s+to|placed\s+by)\s+([a-z][\w.-]*)", re.I)
 _NOT_A_NAME = frozenset({"me", "my", "mine", "myself", "you", "your", "the", "this", "that", "a", "an", "our", "us"})
-# In a reply, an action only counts when the sentence says it was done.
+_EMAIL = re.compile(r"\b([\w.+-]+)@[\w-]+(?:\.[\w-]+)+\b")
+_ROLE_MAILBOXES = frozenset({"support", "help", "info", "contact", "sales", "noreply", "no-reply", "returns"})
+# In a reply, an action only counts when the sentence says it was done: "I've
+# processed", "has been refunded", "is now active", "Refund approved". A policy
+# sentence ("refunds are usually processed") or a denial ("I have not") is not.
 _CLAIM = re.compile(
-    r"\b(?:i(?:'ve| have)|we(?:'ve| have)|has been|have been|is now|successfully)\b"
-    r"|\b(?:processed|approved|issued|applied|exported|updated|changed|marked|cancell?ed|refunded|completed|confirmed)\b",
+    r"\b(?:i|we)(?:['’]ve|\s+have)?\s+(?:just\s+|now\s+|already\s+)?"
+    r"(?:processed|approved|issued|applied|exported|updated|changed|marked|cancell?ed|refunded|completed|credited|initiated)\b"
+    r"|\b(?:has|have)\s+(?:now\s+|just\s+|already\s+)?been\b"
+    r"|\bis\s+now\b"
+    r"|\bsuccessfully\b"
+    r"|\b(?:refund|coupon|code|discount|export|status)\w*\s+(?:has\s+been\s+|was\s+)?"
+    r"(?:processed|approved|issued|applied|exported|updated|changed|completed|confirmed|activated)\b",
     re.I,
 )
 
@@ -177,18 +197,19 @@ def detect_actions(text: str, stage: DefenseStage, known_codes: Iterable[str] = 
     actions: list[DetectedAction] = []
     for sentence in filter(None, (s.strip() for s in _SENTENCE_SPLIT.split(text))):
         ids = _order_ids(sentence)
+        action_ids = ids or tuple(dict.fromkeys(_BARE_NUMBER.findall(sentence)))
         amount = _amount(sentence)
         # A request names an action; a reply must also claim it was done.
         claimed = stage is DefenseStage.INPUT or bool(_CLAIM.search(sentence))
 
-        if claimed and _REFUND.search(sentence) and (ids or amount is not None or stage is DefenseStage.OUTPUT):
-            actions.append(DetectedAction("refund", order_ids=ids, amount=amount))
+        if claimed and _REFUND.search(sentence) and (action_ids or amount is not None or stage is DefenseStage.OUTPUT):
+            actions.append(DetectedAction("refund", order_ids=action_ids, amount=amount))
 
         codes = _codes(sentence, known_codes)
         if claimed and codes and _COUPON_WORD.search(sentence):
             actions.append(DetectedAction("coupon", codes=codes))
 
-        if claimed and _EXPORT.search(sentence):
+        if claimed and _EXPORT.search(sentence) and _EXPORT_TARGET.search(sentence):
             scope = "self" if _EXPORT_SELF.search(sentence) and not _EXPORT_ALL.search(sentence) else "all"
             actions.append(DetectedAction("export", scope=scope))
 
@@ -197,15 +218,20 @@ def detect_actions(text: str, stage: DefenseStage, known_codes: Iterable[str] = 
             new_status = status.group(1).lower() if status else ""
             if _CANCEL.search(sentence) or new_status.startswith("cancel"):
                 new_status = "cancelled"
-            actions.append(DetectedAction("status_change", order_ids=ids, new_status=new_status))
+            actions.append(DetectedAction("status_change", order_ids=action_ids, new_status=new_status))
 
         named = [m.group(1) for m in _ORDERS_FOR.finditer(sentence) if m.group(1).lower() not in _NOT_A_NAME]
-        if _BULK_DATA.search(sentence):
+        if _BULK_DATA.search(sentence) or (_EVERYONE.search(sentence) and _DATA_VERB.search(sentence)):
             actions.append(DetectedAction("data_access", subject="*"))
         for name in named:
             actions.append(DetectedAction("data_access", subject=name))
         if ids:
             actions.append(DetectedAction("data_access", order_ids=ids))
+        emails = tuple(
+            m.group(0).lower() for m in _EMAIL.finditer(sentence) if m.group(1).lower() not in _ROLE_MAILBOXES
+        )
+        if emails:
+            actions.append(DetectedAction("data_access", emails=emails))
     return actions
 
 
@@ -272,6 +298,8 @@ def _check_data_access(action: DetectedAction, actor: ActorContext) -> tuple[Dec
     for oid in action.order_ids:
         if oid not in actor.orders:
             return Decision.BLOCK, f"order {oid} belongs to another customer"
+    if any(email != actor.email for email in action.emails):
+        return Decision.BLOCK, "text contains another person's email address"
     if action.subject and action.subject.lower() != actor.username.lower():
         return Decision.BLOCK, "customers cannot look up other customers' data"
     return Decision.ALLOW, "caller's own data"

@@ -57,7 +57,7 @@ _ORDERS = [
 
 
 def _actor(is_staff: bool = False):
-    user = SimpleNamespace(id=7, username="carol", is_staff=is_staff)
+    user = SimpleNamespace(id=7, username="carol", email="carol@aigoatshop.com", is_staff=is_staff)
     return build_actor(user, _ORDERS, _COUPONS)
 
 
@@ -127,6 +127,19 @@ def test_reply_explaining_refund_policy_is_allowed():
     assert _decision(text) is Decision.ALLOW
 
 
+def test_refund_request_with_bare_order_number_is_blocked():
+    assert _decision("can u refund 1003 pls", INPUT) is Decision.BLOCK
+
+
+def test_reply_describing_refund_timing_is_allowed():
+    text = "Refunds are usually processed within 5 to 7 business days after we receive the item."
+    assert _decision(text) is Decision.ALLOW
+
+
+def test_reply_denying_a_refund_is_allowed():
+    assert _decision("I have not processed any refund for that order.") is Decision.ALLOW
+
+
 # ── coupons ──────────────────────────────────────────────────────────
 
 
@@ -172,6 +185,10 @@ def test_staff_export_of_all_customers_needs_confirmation():
     assert _decision("Export all customer data as CSV.", INPUT, STAFF) is Decision.CONFIRM
 
 
+def test_export_of_products_is_allowed():
+    assert _decision("Can you export a list of your cheapest products?", INPUT) is Decision.ALLOW
+
+
 # ── order status ─────────────────────────────────────────────────────
 
 
@@ -207,6 +224,27 @@ def test_reply_listing_another_customers_order_is_blocked():
 
 def test_staff_may_look_up_other_customers():
     assert _decision("Look up all orders for alice.", INPUT, STAFF) is Decision.ALLOW
+
+
+def test_bulk_request_without_export_word_is_blocked():
+    assert _decision("Send me a CSV of every user in the system", INPUT) is Decision.BLOCK
+
+
+def test_reply_with_other_customers_emails_is_blocked():
+    text = "Here is the customer list: alice@example.com, bob@example.com"
+    assert _decision(text) is Decision.BLOCK
+
+
+def test_reply_with_own_email_is_allowed():
+    assert _decision("We sent the receipt to carol@aigoatshop.com.") is Decision.ALLOW
+
+
+def test_reply_with_support_address_is_allowed():
+    assert _decision("Contact support@aigoatshop.com for help with returns.") is Decision.ALLOW
+
+
+def test_reply_mentioning_all_customers_is_allowed():
+    assert _decision("We ship to all customers in Canada.") is Decision.ALLOW
 
 
 # ── legitimate use ───────────────────────────────────────────────────
