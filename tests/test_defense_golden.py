@@ -194,7 +194,10 @@ class TestBaselineEncodesExpectedBehaviour:
     _BASELINE["output"],
     ids=lambda r: f"{r['text_id']}-L{r['level']}-pipeline",
 )
-async def test_output_moderation_matches_golden_via_pipeline(row):
+async def test_output_moderation_matches_golden_via_pipeline(row, monkeypatch):
+    # Pins the output moderator through the pipeline. action.firewall is a second
+    # output control with its own tests (tests/test_action_firewall.py).
+    monkeypatch.setattr(get_settings().defense, "action_firewall_enabled", False)
     text = _OUTPUT_TEXT[row["text_id"]]
     moderated = await defense_pipeline.moderate_output(text, row["level"])
     where = f"{row['text_id']} at L{row['level']} (pipeline)"
