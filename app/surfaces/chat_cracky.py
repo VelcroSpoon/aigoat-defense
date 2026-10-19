@@ -13,6 +13,7 @@ from app.core.config import get_settings
 from app.core.lab_loader import get_lab_dict
 from app.core.token_utils import truncate_chunks_to_budget
 from app.defense.control import get_control
+from app.defense.controls.action_firewall import ActorContext, build_actor
 from app.defense.nemo_guardrails import get_guardrails_service
 from app.defense.pipeline import PipelineResult, defense_pipeline
 from app.defense.profiles import resolve_profile
@@ -50,6 +51,13 @@ def resolve_chat_level(body: ChatRequest, user: User) -> int:
     return user.defense_level
 
 
+async def load_actor(db: AsyncSession, user: User) -> ActorContext:
+    """Identity for action.firewall, read from the database rather than the prompt."""
+    orders_result = await db.execute(select(Order).where(Order.user_id == user.id))
+    coupons_result = await db.execute(select(Coupon).where(Coupon.is_active == True))
+    return build_actor(user, orders_result.scalars().all(), coupons_result.scalars().all())
+
+
 async def prepare_chat(
     body: ChatRequest,
     user: User,
@@ -60,10 +68,11 @@ async def prepare_chat(
     raw_message = body.message
     user_message = body.message
     input_result: PipelineResult | None = None
+    actor = await load_actor(db, user) if level >= 1 else None
 
     if level >= 1:
         input_result = await defense_pipeline.process_input(
-            user_message, level, user_id=user.id, surface="chat.cracky"
+            user_message, level, user_id=user.id, surface="chat.cracky", context={"actor": actor}
         )
         if not input_result.allowed:
             logger.info(
@@ -187,6 +196,8 @@ async def prepare_chat(
             "kb_used": body.use_kb and kb_context_count > 0,
             "kb_context_count": kb_context_count,
             "user_message": user_message,
+            "user_id": user.id,
+            "actor": actor,
         },
         raw_message=raw_message,
         input_result=input_result,
@@ -257,7 +268,13 @@ async def generate_moderated_reply(prepared: dict[str, Any]) -> tuple[str, str]:
     visible = raw
     level = prepared["level"]
     if level >= 1:
-        visible = await defense_pipeline.moderate_output(visible, level, surface="chat.cracky")
+        visible = await defense_pipeline.moderate_output(
+            visible,
+            level,
+            surface="chat.cracky",
+            user_id=prepared.get("user_id"),
+            context={"actor": prepared.get("actor")},
+        )
     if level >= 2:
         nemo = get_guardrails_service()
         if nemo.available:
