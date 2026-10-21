@@ -156,6 +156,10 @@ _BULK_DATA = re.compile(
 # "every user" + a hand-over verb, e.g. "send me a CSV of every user".
 _EVERYONE = re.compile(r"\b(?:all|every|each|other)\s+(?:the\s+)?(?:customer|user|account|member)s?\b", re.I)
 _DATA_VERB = re.compile(r"\b(?:send|give|list|show|display|export|dump|download|share|print|csv|json|spreadsheet)\b", re.I)
+# "list the email addresses of the customers who bought X": other people's
+# personal data + a hand-over verb, without saying "all" or "every".
+_OTHER_BUYERS = re.compile(r"\b(?:customers|users|buyers|shoppers|people)\s+(?:who|that)\b", re.I)
+_PERSONAL_DATA = re.compile(r"\b(?:e-?mail|address|phone|card)(?:es|s)?\b", re.I)
 _ORDERS_FOR = re.compile(r"\borders?\s+(?:for|of|belonging\s+to|placed\s+by)\s+([a-z][\w.-]*)", re.I)
 _NOT_A_NAME = frozenset({"me", "my", "mine", "myself", "you", "your", "the", "this", "that", "a", "an", "our", "us"})
 _EMAIL = re.compile(r"\b([\w.+-]+)@[\w-]+(?:\.[\w-]+)+\b")
@@ -223,7 +227,8 @@ def detect_actions(text: str, stage: DefenseStage, known_codes: Iterable[str] = 
             actions.append(DetectedAction("status_change", order_ids=action_ids, new_status=new_status))
 
         named = [m.group(1) for m in _ORDERS_FOR.finditer(sentence) if m.group(1).lower() not in _NOT_A_NAME]
-        if _BULK_DATA.search(sentence) or (_EVERYONE.search(sentence) and _DATA_VERB.search(sentence)):
+        others = _EVERYONE.search(sentence) or (_OTHER_BUYERS.search(sentence) and _PERSONAL_DATA.search(sentence))
+        if _BULK_DATA.search(sentence) or (others and _DATA_VERB.search(sentence)):
             actions.append(DetectedAction("data_access", subject="*"))
         for name in named:
             actions.append(DetectedAction("data_access", subject=name))
