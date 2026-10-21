@@ -205,8 +205,10 @@ def detect_actions(text: str, stage: DefenseStage, known_codes: Iterable[str] = 
         if claimed and _REFUND.search(sentence) and (action_ids or amount is not None or stage is DefenseStage.OUTPUT):
             actions.append(DetectedAction("refund", order_ids=action_ids, amount=amount))
 
+        # A code from the coupon table counts on its own ("I may use STAFF100. Apply
+        # it."); a code that only looks like one needs a coupon word beside it.
         codes = _codes(sentence, known_codes)
-        if claimed and codes and _COUPON_WORD.search(sentence):
+        if claimed and codes and (_COUPON_WORD.search(sentence) or any(c in known_codes for c in codes)):
             actions.append(DetectedAction("coupon", codes=codes))
 
         if claimed and _EXPORT.search(sentence) and _EXPORT_TARGET.search(sentence):
