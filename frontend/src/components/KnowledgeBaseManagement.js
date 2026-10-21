@@ -141,18 +141,27 @@ const KnowledgeBaseManagement = () => {
     try {
       setLoading(true);
       
+      let saved;
       if (editingDoc) {
         // Update existing document
-        await axios.put(`/api/knowledge-base/${editingDoc.id}/`, formData, {
+        saved = await axios.put(`/api/knowledge-base/${editingDoc.id}/`, formData, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
       } else {
         // Add new document
-        await axios.post('/api/knowledge-base/', formData, {
+        saved = await axios.post('/api/knowledge-base/', formData, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
       }
-      
+      const firewall = saved?.data?.kb_firewall;
+      if (firewall?.quarantined) {
+        setSnack({
+          open: true,
+          severity: 'warning',
+          message: `KB Firewall held this entry for review (risk ${firewall.risk.toFixed(2)}): ${firewall.reasons.join('; ')}`,
+        });
+      }
+
       setOpenDialog(false);
       setEditingDoc(null);
       setFormData({ product_id: '', title: '', content: '', category: 'product_info', trust_tier: 'user' });
@@ -161,6 +170,11 @@ const KnowledgeBaseManagement = () => {
       
     } catch (error) {
       console.error('Error saving document:', error);
+      setSnack({
+        open: true,
+        severity: 'error',
+        message: error.response?.data?.detail || 'Could not save the document.',
+      });
     } finally {
       setLoading(false);
     }

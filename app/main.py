@@ -63,6 +63,7 @@ from app.api.support import router as support_router
 from app.api.surfaces import router as surfaces_router
 from app.api.system import router as system_router
 from app.api.taxonomy import router as taxonomy_router
+from app.kb_firewall.api import router as kb_firewall_router
 
 app.include_router(auth_router)
 app.include_router(shop_router)
@@ -80,3 +81,4 @@ app.include_router(surfaces_router)
 app.include_router(agent_router)
 app.include_router(mcp_router)
 app.include_router(killchain_router)
+app.include_router(kb_firewall_router)

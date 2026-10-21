@@ -141,6 +141,24 @@ class McpConfig(BaseModel):
         return v
 
 
+class KbFirewallConfig(BaseModel):
+    # Off by default so the stock labs keep their intended vulnerability.
+    enabled: bool = False
+    # "block" drops flagged chunks and quarantines flagged writes; "monitor" only logs them.
+    mode: str = "block"
+    # Same English model the RAG index uses; other languages are covered by the cue patterns.
+    semantic_model: str = "all-MiniLM-L6-v2"
+    risk_threshold: float = 0.6
+    semantic_margin: float = 0.1
+
+    @field_validator("mode")
+    @classmethod
+    def mode_known(cls, v: str) -> str:
+        if v not in ("block", "monitor"):
+            raise ValueError("kb_firewall.mode must be 'block' or 'monitor'")
+        return v
+
+
 class Settings(BaseModel):
     app: AppConfig = Field(default_factory=AppConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
@@ -153,6 +171,7 @@ class Settings(BaseModel):
     surfaces: SurfacesConfig = Field(default_factory=SurfacesConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)
     mcp: McpConfig = Field(default_factory=McpConfig)
+    kb_firewall: KbFirewallConfig = Field(default_factory=KbFirewallConfig)
 
 
 def load_config(path: str | Path | None = None) -> Settings:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.dependencies import require_admin as _require_admin
+from app.kb_firewall import QUARANTINE_TIER, get_kb_firewall
 from app.models import KnowledgeBaseEntry, Product, User
 from app.rag.service import get_rag_service
 from app.schemas.rag import RagTraceIn
@@ -329,14 +331,28 @@ async def add_kb_entry(
         prod = await db.execute(select(Product).where(Product.id == body.product_id))
         if not prod.scalar_one_or_none():
             raise HTTPException(status_code=404, detail="Product not found")
+    trust_tier = body.trust_tier or "user"
+    owner_id = body.owner_id if body.owner_id is not None else user.id
+    firewall = get_kb_firewall()
+    verdict = None
+    if firewall.enabled:
+        # Callers may not pick their own trust tier or post as someone else.
+        if not user.is_staff:
+            trust_tier = "user"
+            owner_id = user.id
+        verdict = await asyncio.to_thread(
+            firewall.check_write, title=body.title, content=body.content, user=user
+        )
+        if verdict.flagged and firewall.blocking:
+            trust_tier = QUARANTINE_TIER
     entry = KnowledgeBaseEntry(
         product_id=body.product_id,
         title=body.title,
         content=body.content,
         category=body.category,
         is_user_injected=True,
-        trust_tier=body.trust_tier or "user",
-        owner_id=body.owner_id if body.owner_id is not None else user.id,
+        trust_tier=trust_tier,
+        owner_id=owner_id,
         version=body.version,
         is_latest=body.is_latest,
         valid_until=_parse_valid_until(body.valid_until),
@@ -344,7 +360,10 @@ async def add_kb_entry(
     db.add(entry)
     await db.commit()
     await db.refresh(entry)
-    return {"id": entry.id, "product_id": entry.product_id, "title": entry.title}
+    out = {"id": entry.id, "product_id": entry.product_id, "title": entry.title}
+    if verdict is not None:
+        out["kb_firewall"] = {"quarantined": entry.trust_tier == QUARANTINE_TIER, **verdict.to_dict()}
+    return out
 
 
 @router.put("/api/knowledge-base/{entry_id:int}/")
@@ -359,15 +378,29 @@ async def update_kb_entry(
     entry = result.scalar_one_or_none()
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
+    firewall = get_kb_firewall()
+    if firewall.enabled and not user.is_staff and entry.owner_id != user.id:
+        # Shared and system entries (owner_id NULL) are edited by staff only.
+        raise HTTPException(status_code=403, detail="You can only edit knowledge-base entries you own")
     if body.title is not None:
         entry.title = body.title
     if body.content is not None:
         entry.content = body.content
     if body.category is not None:
         entry.category = body.category
+    verdict = None
+    if firewall.enabled and (body.title is not None or body.content is not None):
+        verdict = await asyncio.to_thread(
+            firewall.check_write, title=entry.title, content=entry.content, user=user, entry_id=entry.id
+        )
+        if verdict.flagged and firewall.blocking:
+            entry.trust_tier = QUARANTINE_TIER
     await db.commit()
     await db.refresh(entry)
-    return {"id": entry.id, "updated": True}
+    out = {"id": entry.id, "updated": True}
+    if verdict is not None:
+        out["kb_firewall"] = {"quarantined": entry.trust_tier == QUARANTINE_TIER, **verdict.to_dict()}
+    return out
 
 
 @router.delete("/api/knowledge-base/{entry_id:int}/")

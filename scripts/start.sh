@@ -18,6 +18,11 @@ DB_FILE="$PROJECT_ROOT/aigoat.db"
 CHROMA_DIR="$PROJECT_ROOT/chroma_db"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
+# Paths inside Python snippets must be native. Windows Python cannot open the /c/... paths Git Bash uses.
+PY_ROOT="$PROJECT_ROOT"
+if command -v cygpath >/dev/null 2>&1; then
+    PY_ROOT="$(cygpath -m "$PROJECT_ROOT")"
+fi
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -58,11 +63,18 @@ fi
 mkdir -p "$PID_DIR"
 
 # ── Pre-flight: check dependencies ────────────────────────────
-command -v python3 >/dev/null 2>&1 || fail "python3 is not installed"
 command -v node    >/dev/null 2>&1 || fail "node is not installed"
 command -v npm     >/dev/null 2>&1 || fail "npm is not installed"
 command -v curl    >/dev/null 2>&1 || fail "curl is not installed"
-command -v lsof    >/dev/null 2>&1 || fail "lsof is not installed (needed to see whether ports $BACKEND_PORT and $FRONTEND_PORT are free)"
+
+# port_in_use works on Linux (lsof) and Windows Git Bash (netstat)
+port_in_use() {
+    if command -v lsof >/dev/null 2>&1; then
+        lsof -ti:"$1" >/dev/null 2>&1
+    else
+        netstat -ano 2>/dev/null | grep -qE "[ :](${1})\s.*LISTEN"
+    fi
+}
 
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
 if [ "$NODE_MAJOR" -lt 18 ]; then
@@ -89,6 +101,13 @@ PYTHON_311="$(command -v python3.11 || true)"
 if [ -z "$PYTHON_311" ] && [ -x "${HOME}/.local/bin/python3.11" ]; then
     PYTHON_311="${HOME}/.local/bin/python3.11"
 fi
+# Windows fallback: use py launcher to resolve the real executable path
+if [ -z "$PYTHON_311" ] && command -v py >/dev/null 2>&1 && py -3.11 --version >/dev/null 2>&1; then
+    PYTHON_311="$(py -3.11 -c 'import sys; print(sys.executable)' | tr '\\' '/')"
+fi
+if [ -z "$PYTHON_311" ] && [ -x "/c/Users/LENOVO/AppData/Local/Programs/Python/Python311/python.exe" ]; then
+    PYTHON_311="/c/Users/LENOVO/AppData/Local/Programs/Python/Python311/python.exe"
+fi
 
 if [ ! -d "venv" ]; then
     if [ -z "$PYTHON_311" ]; then
@@ -99,8 +118,26 @@ if [ ! -d "venv" ]; then
     ok "Virtual environment created"
 fi
 
+# Activate venv. On Windows/Git Bash the activate script puts a Windows-style path on PATH
+# that bash can't resolve, so we also expose the venv Python as a direct function.
 # shellcheck disable=SC1091
-source venv/bin/activate
+if [ -f "venv/bin/activate" ]; then
+    source venv/bin/activate
+elif [ -f "venv/Scripts/activate" ]; then
+    # shellcheck disable=SC1090
+    source venv/Scripts/activate
+    # On Windows/Git Bash, define python3 as a direct call to the venv exe so that
+    # PATH translation issues can't cause pip to write to a wrong lowercase path.
+    if [[ "$OSTYPE" == msys* || "$OSTYPE" == cygwin* ]]; then
+        _VENV_PY="$PROJECT_ROOT/venv/Scripts/python.exe"
+        python3() { "$_VENV_PY" "$@"; }
+        export -f python3
+        # Pip reads VIRTUAL_ENV; keep it pointing to the actual venv so installs go there.
+        export VIRTUAL_ENV="$PROJECT_ROOT/venv"
+    fi
+else
+    fail "Could not find venv activate script"
+fi
 
 VENV_PY=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
 if [ "$VENV_PY" != "3.11" ]; then
@@ -116,7 +153,8 @@ ok "Python dependencies ready"
 info "Checking Ollama..."
 
 if command -v ollama >/dev/null 2>&1; then
-    if ! pgrep -x "ollama" >/dev/null 2>&1 && ! curl -sf http://localhost:11434/api/tags >/dev/null 2>&1; then
+    ollama_running() { pgrep -x "ollama" >/dev/null 2>&1 || tasklist /FI "IMAGENAME eq ollama.exe" 2>/dev/null | grep -qi "ollama.exe" || curl -sf http://localhost:11434/api/tags >/dev/null 2>&1; }
+    if ! ollama_running; then
         info "Starting Ollama in the background..."
         nohup ollama serve > "$PROJECT_ROOT/logs/ollama.log" 2>&1 &
         echo $! > "$PID_DIR/ollama.pid"
@@ -129,13 +167,13 @@ if command -v ollama >/dev/null 2>&1; then
 
         MODEL=$(python3 -c "
 import yaml
-with open('$PROJECT_ROOT/config/config.yml') as f:
+with open('$PY_ROOT/config/config.yml') as f:
     cfg = yaml.safe_load(f) or {}
 print((cfg.get('ollama') or {}).get('model') or 'mistral')
 ")
         AGENT_MODEL=$(python3 -c "
 import yaml
-with open('$PROJECT_ROOT/config/config.yml') as f:
+with open('$PY_ROOT/config/config.yml') as f:
     cfg = yaml.safe_load(f) or {}
 value = (cfg.get('ollama') or {}).get('agent_model')
 print('' if not value else value)
@@ -191,7 +229,7 @@ if [ -f "$DB_FILE" ]; then
     DB_STATE=$(python3 -c "
 import sqlite3
 try:
-    names = {row[0] for row in sqlite3.connect('$DB_FILE').execute(\"SELECT name FROM sqlite_master WHERE type='table'\")}
+    names = {row[0] for row in sqlite3.connect('$PY_ROOT/aigoat.db').execute(\"SELECT name FROM sqlite_master WHERE type='table'\")}
 except Exception:
     names = set()
 if 'alembic_version' in names:
@@ -250,7 +288,7 @@ python3 -m scripts.seed --sync-challenges
 ok "Challenge metadata synced"
 
 # ── Step 5: Start backend ──────────────────────────────────────
-if lsof -ti:"$BACKEND_PORT" >/dev/null 2>&1; then
+if port_in_use "$BACKEND_PORT"; then
     if curl -sf -o /dev/null --max-time 2 "http://127.0.0.1:$BACKEND_PORT/docs"; then
         warn "Port $BACKEND_PORT is already in use and the API is answering. Leaving it running."
     else
@@ -258,7 +296,8 @@ if lsof -ti:"$BACKEND_PORT" >/dev/null 2>&1; then
     fi
 else
     info "Starting backend on port $BACKEND_PORT..."
-    nohup python3 -m uvicorn app.main:app \
+    # nohup is an external program and cannot see the python3 shell function, so pass the venv exe on Windows.
+    nohup "${_VENV_PY:-python3}" -m uvicorn app.main:app \
         --host 0.0.0.0 \
         --port "$BACKEND_PORT" \
         --log-level info \
@@ -271,7 +310,7 @@ else
 fi
 
 # ── Step 6: Start frontend ────────────────────────────────────
-if lsof -ti:"$FRONTEND_PORT" >/dev/null 2>&1; then
+if port_in_use "$FRONTEND_PORT"; then
     if curl -sf -o /dev/null --max-time 2 "http://127.0.0.1:$FRONTEND_PORT/"; then
         warn "Port $FRONTEND_PORT is already in use and the app is answering. Leaving it running."
     else

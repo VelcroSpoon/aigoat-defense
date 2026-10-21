@@ -1,6 +1,7 @@
 """chat.cracky — existing shop/lab chat path behind TargetSurface."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Any
@@ -16,6 +17,7 @@ from app.defense.control import get_control
 from app.defense.nemo_guardrails import get_guardrails_service
 from app.defense.pipeline import PipelineResult, defense_pipeline
 from app.defense.profiles import resolve_profile
+from app.kb_firewall import get_kb_firewall
 from app.models import Coupon, Order, Product, User
 from app.rag.service import get_rag_service
 from app.schemas.chat import ChatRequest, ChatResponse
@@ -147,16 +149,27 @@ async def prepare_chat(
         try:
             rag = get_rag_service()
             results = await rag._retrieval.query_async(body.message, top_k=rag._top_k)
+            firewall = get_kb_firewall()
+            results, _blocked = await asyncio.to_thread(
+                firewall.filter_chunks, results, surface="chat.cracky", user=user, query=body.message
+            )
             kb_context_count = len(results)
             if results:
                 chunks = [r.get("content", "") for r in results if r.get("content")]
                 chunks = truncate_chunks_to_budget(chunks, settings.rag.max_context_tokens)
                 retrieval_chunks = list(chunks)
                 kb_context_count = len(chunks)
-                kb_context = (
-                    "KNOWLEDGE BASE CONTEXT (retrieved from product knowledge base):\n"
-                    + "\n---\n".join(chunks)
-                )
+                if firewall.enabled:
+                    kept = [r for r in results if r.get("content") in chunks]
+                    kb_context = (
+                        "KNOWLEDGE BASE CONTEXT (retrieved from product knowledge base):\n"
+                        + firewall.spotlight(kept)
+                    )
+                else:
+                    kb_context = (
+                        "KNOWLEDGE BASE CONTEXT (retrieved from product knowledge base):\n"
+                        + "\n---\n".join(chunks)
+                    )
         except Exception:
             pass
 
