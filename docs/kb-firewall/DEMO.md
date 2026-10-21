@@ -1,4 +1,4 @@
-# KB Firewall — 10-minute presentation and live demo
+# KB Firewall: 10-minute presentation and live demo
 
 Goal: the judges see the attack work, see the firewall stop it, and see normal answers still work.
 The demo is the centerpiece; slides are only for minutes 0–2 and 8–10.

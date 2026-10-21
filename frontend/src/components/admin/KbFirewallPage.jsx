@@ -256,7 +256,7 @@ const KbFirewallPage = () => {
                   </Alert>
                   {scanResult.signals.map((s) => (
                     <Typography key={s.label} variant="body2" sx={{ mb: 0.5 }}>
-                      <b>{s.label}</b> (+{s.weight.toFixed(2)}, {s.source}) — <i>{s.evidence}</i>
+                      <b>{s.label}</b> (+{s.weight.toFixed(2)}, {s.source}): <i>{s.evidence}</i>
                     </Typography>
                   ))}
                 </Box>

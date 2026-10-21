@@ -25,6 +25,7 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.token_utils import truncate_chunks_to_budget
+from app.kb_firewall import get_kb_firewall
 from app.models import (
     Challenge,
     ChallengeAttempt,
@@ -34,7 +35,6 @@ from app.models import (
     Product,
     User,
 )
-from app.kb_firewall import get_kb_firewall
 from app.rag.service import get_rag_service
 from app.services.ollama_client import get_ollama_client
 

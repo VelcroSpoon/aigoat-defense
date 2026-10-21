@@ -1,4 +1,4 @@
-# KB Firewall — Technical Overview
+# KB Firewall: Technical Overview
 
 **Bishop's University AI Cybersecurity Challenge 2026**
 Protecting AI Goat's chatbot from knowledge-base poisoning (indirect prompt injection through RAG).
