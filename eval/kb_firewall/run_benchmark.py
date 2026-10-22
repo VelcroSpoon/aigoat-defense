@@ -38,7 +38,8 @@ def main() -> int:
                     help="original = dataset.py (used for tuning); fresh = fresh_dataset.py (written afterwards)")
     args = ap.parse_args()
     if args.set == "fresh":
-        from eval.kb_firewall.fresh_dataset import ATTACKS as attacks, BENIGN as benign
+        from eval.kb_firewall.fresh_dataset import ATTACKS as attacks
+        from eval.kb_firewall.fresh_dataset import BENIGN as benign
     else:
         attacks, benign = ATTACKS, BENIGN
 
