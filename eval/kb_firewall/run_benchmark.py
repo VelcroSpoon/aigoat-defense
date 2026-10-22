@@ -34,7 +34,13 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--details", action="store_true")
     ap.add_argument("--model", default=None, help="embedding model (default: kb_firewall.semantic_model)")
+    ap.add_argument("--set", choices=("original", "fresh"), default="original",
+                    help="original = dataset.py (used for tuning); fresh = fresh_dataset.py (written afterwards)")
     args = ap.parse_args()
+    if args.set == "fresh":
+        from eval.kb_firewall.fresh_dataset import ATTACKS as attacks, BENIGN as benign
+    else:
+        attacks, benign = ATTACKS, BENIGN
 
     cfg = get_settings().kb_firewall
     semantic = SemanticScanner(args.model or cfg.semantic_model, get_settings().rag.embedding_model)
@@ -49,7 +55,7 @@ def main() -> int:
     timings: dict[str, float] = {}
     for name, fn in detectors.items():
         start = time.perf_counter()
-        for label, items in (("attack", ATTACKS), ("benign", BENIGN)):
+        for label, items in (("attack", attacks), ("benign", benign)):
             for category, text in items:
                 out = fn(text)
                 flagged = out if isinstance(out, bool) else out.flagged
@@ -61,7 +67,7 @@ def main() -> int:
                     kind = "MISS" if label == "attack" else "FALSE POSITIVE"
                     extra = "" if isinstance(out, bool) else f" risk={out.risk:.2f} {out.reasons}"
                     misses[name].append(f"  {kind} [{category}] {text[:110]!r}{extra}")
-        timings[name] = (time.perf_counter() - start) * 1000 / (len(ATTACKS) + len(BENIGN))
+        timings[name] = (time.perf_counter() - start) * 1000 / (len(attacks) + len(benign))
 
     print(f"Embedding model: {semantic.model_name} (requested {args.model or cfg.semantic_model})")
     if semantic.error:
