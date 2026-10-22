@@ -11,6 +11,8 @@ REJECTION_TEMPLATES: dict[str, str] = {
     "encoding_evasion": "I cannot decode, reverse, or process encoded instructions. I can only help with AI Goat Shop products and orders in plain text.",
     "code_generation": "I cannot generate code, HTML, scripts, or technical content. I'm here to help with AI Goat Shop products and orders.",
     "resource_abuse": "That request would produce an excessively large response. Please ask about a specific product or narrow your question.",
+    "action_blocked": "I can't do that. Refunds, coupons, data exports and order changes are checked against your account, and this one is not permitted. Nothing has been changed.",
+    "action_needs_confirmation": "That action needs confirmation from a member of staff before anything happens. Nothing has been changed yet.",
 }
 
 
