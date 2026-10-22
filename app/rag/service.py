@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Any
 
@@ -8,6 +9,7 @@ from app.core.token_utils import truncate_chunks_to_budget
 from app.defense.chain import run_chain
 from app.defense.control import DefenseDecision, DefenseStage, get_control
 from app.defense.profiles import resolve_profile
+from app.kb_firewall import get_kb_firewall
 from app.rag.embeddings import get_embedding_service
 from app.rag.injection_detector import detect_injection
 from app.rag.query_rewriter import rewrite_query
@@ -72,6 +74,14 @@ class RAGService:
         )
         chain = await run_chain(retrieval_ids, decision)
         candidates = list(decision.context.get("candidates") or candidates)
+        firewall = get_kb_firewall()
+        live = [c for c in candidates if c.get("included_in_context", True)]
+        _kept, blocked = await asyncio.to_thread(
+            firewall.filter_chunks, live, surface=surface, query=query
+        )
+        for cand in blocked:
+            cand["included_in_context"] = False
+            cand["excluded_by_control"] = "kb_firewall"
         budget = apply_token_budget(candidates, get_settings().rag.max_context_tokens)
         controls_applied = list(profile.controls) if profile else []
         citations: list[dict[str, Any]] = []
@@ -118,7 +128,11 @@ class RAGService:
             citations = list(trace.get("citations") or [])
             raw_chunks = [c.get("content", "") for c in contexts if c.get("content")]
             trimmed = truncate_chunks_to_budget(raw_chunks, get_settings().rag.max_context_tokens)
-            context_bloc = "\n\n".join(trimmed)
+            firewall = get_kb_firewall()
+            if firewall.enabled:
+                context_bloc = firewall.spotlight([c for c in contexts if c.get("content") in trimmed])
+            else:
+                context_bloc = "\n\n".join(trimmed)
             system = f"{base_prompt}\n\nContext:\n{context_bloc}"
         else:
             system = base_prompt

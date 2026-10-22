@@ -58,3 +58,12 @@ mcp:
   registry_path: "./config/mcp_servers.yml"
   spawn_timeout: 15
   max_concurrent: 2
+
+# KB Firewall (docs/kb-firewall/TECHNICAL_OVERVIEW.md). Off by default so the labs stay vulnerable;
+# an admin can also switch it at runtime from /admin/kb-firewall.
+kb_firewall:
+  enabled: false
+  mode: "block"            # "block" drops and quarantines; "monitor" only logs
+  semantic_model: "all-MiniLM-L6-v2"   # English; the cue patterns cover es/fr/pt/de
+  risk_threshold: 0.6
+  semantic_margin: 0.1

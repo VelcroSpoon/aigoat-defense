@@ -32,6 +32,7 @@ import {
   AccountCircle as AccountCircleIcon,
   ShoppingBag as ShoppingBagIcon,
   Inventory as InventoryIcon,
+  Shield as ShieldIcon,
   Assignment as OrderManagementIcon,
   LibraryBooks as LibraryBooksIcon,
   SmartToy as AIIcon,
@@ -570,6 +571,10 @@ const Header = () => {
                 <MenuItem onClick={() => handleProfileMenuClick('/feedback-management')} sx={{ color: 'text.primary', '&:hover': { bgcolor: (t) => t.palette.custom?.overlay?.active } }}>
                   <ListItemIcon><FeedbackIcon sx={{ color: 'text.secondary' }} fontSize="small" /></ListItemIcon>
                   <ListItemText>Feedback Management</ListItemText>
+                </MenuItem>
+                <MenuItem onClick={() => handleProfileMenuClick('/admin/kb-firewall')} sx={{ color: 'text.primary', '&:hover': { bgcolor: (t) => t.palette.custom?.overlay?.active } }}>
+                  <ListItemIcon><ShieldIcon sx={{ color: 'text.secondary' }} fontSize="small" /></ListItemIcon>
+                  <ListItemText>KB Firewall</ListItemText>
                 </MenuItem>
                 <MenuItem onClick={() => handleProfileMenuClick('/inventory')} sx={{ color: 'text.primary', '&:hover': { bgcolor: (t) => t.palette.custom?.overlay?.active } }}>
                   <ListItemIcon><InventoryIcon sx={{ color: 'text.secondary' }} fontSize="small" /></ListItemIcon>

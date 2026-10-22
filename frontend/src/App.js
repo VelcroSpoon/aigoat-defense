@@ -31,6 +31,7 @@ import LabWorkspace from './components/LabWorkspace';
 import SupportPage from './components/SupportPage';
 import FeedbackManagement from './components/FeedbackManagement';
 import AdminAssistantPage from './components/admin/AdminAssistantPage';
+import KbFirewallPage from './components/admin/KbFirewallPage';
 import AgentHubPage from './components/agent/AgentHubPage';
 import McpHubPage from './components/mcp/McpHubPage';
 import { SearchProvider } from './contexts/SearchContext';
@@ -183,6 +184,11 @@ function AppContent() {
                 <Route path="/feedback-management" element={
                   <ProtectedRoute>
                     <FeedbackManagement />
+                  </ProtectedRoute>
+                } />
+                <Route path="/admin/kb-firewall" element={
+                  <ProtectedRoute>
+                    <KbFirewallPage />
                   </ProtectedRoute>
                 } />
                 <Route path="/admin/assistant" element={

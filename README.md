@@ -1,5 +1,21 @@
 # AIGoat (AI Goat): Open Source AI Security Playground for LLM, Agentic AI, and MCP Red Teaming
 
+> **This fork adds KB Firewall**, our entry for the Bishop's University AI Cybersecurity Challenge 2026:
+> a write-time and read-time firewall that stops knowledge-base poisoning (indirect prompt injection
+> through RAG) from reaching the chatbot, in five languages and against common obfuscation.
+>
+> - What it does and why: [docs/kb-firewall/TECHNICAL_OVERVIEW.md](docs/kb-firewall/TECHNICAL_OVERVIEW.md)
+> - Live demo script: [docs/kb-firewall/DEMO.md](docs/kb-firewall/DEMO.md)
+> - Code: [app/kb_firewall/](app/kb_firewall/) · admin page `/admin/kb-firewall` · tests `tests/test_kb_firewall.py`
+>
+> Try it after `./scripts/start.sh`:
+> ```bash
+> python -m eval.kb_firewall.run_benchmark   # old filter vs KB Firewall on 65 labelled entries
+> python -m eval.kb_firewall.demo_attack     # live attack with the firewall off, then on
+> ```
+> The firewall is off by default so the original labs stay vulnerable; switch it on from the admin page
+> or set `kb_firewall.enabled: true` in `config/config.yml`. The upstream project's README continues below.
+
 <p align="center">
   <img src="media/images/logo.jpg" alt="AIGoat (AI Goat) logo: open source AI security playground" width="200"/>
 </p>
