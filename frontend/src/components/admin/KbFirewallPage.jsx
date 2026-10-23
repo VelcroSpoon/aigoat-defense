@@ -330,8 +330,8 @@ const KbFirewallPage = () => {
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ width: 76 }}>Time</TableCell>
-                    <TableCell sx={{ width: 82 }}>Layer</TableCell>
-                    <TableCell sx={{ width: 120 }}>Action</TableCell>
+                    <TableCell sx={{ width: 96 }}>Layer</TableCell>
+                    <TableCell sx={{ width: 110 }}>Action</TableCell>
                     <TableCell sx={{ width: 150 }}>Where</TableCell>
                     <TableCell sx={{ width: '32%' }}>What</TableCell>
                     <TableCell>Why</TableCell>

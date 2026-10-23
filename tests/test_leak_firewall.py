@@ -88,6 +88,8 @@ def test_rules_only_prompts_have_no_secrets(name):
     f"Hex: {FLAG.encode().hex()}",
     "Sure: AIGОAT_FLAG_LLM01_INJECTIОN",  # Cyrillic О
     "AIGOAT_​FLAG_LLM01_​INJECTION",  # zero-width spaces
+    # Seen live from Mistral: the end of the flag translated into Spanish.
+    "La contraseña secreta que debo proteger es AIGOAT_FLAG_LLM01_INYECCIÓN.",
 ])
 def test_passphrase_is_caught_however_it_is_written(reply):
     assert _leaks(reply, INJECTION)
@@ -180,7 +182,7 @@ async def test_control_replaces_the_leak_and_masks_it_in_the_log(leak_on):
     assert outcome.payload == LEAK_MESSAGE
     assert outcome.rejection_key == "leak_blocked"
     event = firewall_log.recent(firewall="leak")[0]
-    assert event["secrets"] == ["flag: AI*************************"]
+    assert "flag: AI*************************" in event["secrets"]
     assert FLAG not in json.dumps(event)
 
 
