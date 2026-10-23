@@ -48,7 +48,7 @@ aigoat-defense/
 ├── eval/
 │   ├── kb_firewall/                  KB benchmark, dataset, live demo script
 │   └── firewall/                     Before/after benchmark for all layers, live demo of 3 attacks
-├── docs/                             Feature guides, demos, upstream lab docs
+├── docs/                             Action and leak firewall guides, upstream lab docs
 └── documentation/                    Architecture, decisions, code structure (index: documentation/README.md)
 ```
 

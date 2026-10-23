@@ -8,9 +8,9 @@ the `christopher/unified-firewall` branch.
 | Item | Value |
 |---|---|
 | System | AI Goat Firewall: three defensive layers added to the AI Goat shop chatbot (Cracky) |
-| Authors | Christopher and Simon, Bishop's University AI Cybersecurity Challenge 2026 |
+| Authors | Christopher Aguilar Mendez, Simon Grondin and Jeremiah Kisamba Mwamba, Bishop's University AI Cybersecurity Challenge 2026 |
 | Status | Implemented and tested (215 firewall tests, 90% line coverage of firewall code) |
-| Related | [Technical overview](../docs/ai-goat-firewall/TECHNICAL_OVERVIEW.md) · [Code structure](CODE_STRUCTURE.md) · [Documentation index](README.md) |
+| Related | [Code structure](CODE_STRUCTURE.md) · [Documentation index](README.md) |
 
 ---
 
@@ -58,7 +58,7 @@ Ranked; the first one wins when two conflict.
 | Runs fully local (Ollama, SQLite, ChromaDB, local embeddings) | No cloud APIs; the embedding model must already be on disk (`local_files_only`) |
 | Level 0 must stay vulnerable for the labs | Chat firewalls run only at Levels 1 and 2; KB firewall is off by default |
 | Python 3.11, `ruff` and `pyflakes` in CI, React build with `CI=true` | Code must pass lint with zero warnings |
-| Team of two, about one week | Prefer deterministic code over training models; reuse AI Goat's patterns |
+| Team of three, about one week | Prefer deterministic code over training models; reuse AI Goat's patterns |
 
 ## 3. Context and scope
 
@@ -311,7 +311,7 @@ flowchart LR
 | R1 | Test sets were written by the team that tuned the rules | Numbers are optimistic | Measure on a held-out set (the fresh KB set, `eval/kb_firewall/fresh_dataset.py`) and public sets |
 | R2 | Patterns can be studied and evaded | Bypasses with effort | Decisions rest on facts; layers overlap; scanner is admin-only |
 | R3 | Paraphrased leaks and multi-message attacks | Not detected | Per-conversation state; meaning-based leak check |
-| R4 | Lab level resets when a lab page reloads (AI Goat UI) | A demo may silently run at Level 0 | Documented in the demo guide; candidate upstream fix |
+| R4 | Lab level resets when a lab page reloads (AI Goat UI) | A demo may silently run at Level 0 | Workaround: pick Vulnerable, then Hardened; candidate upstream fix |
 | D1 | Two functions with high cyclomatic complexity: `_detect_sentence` (43) and `_extract` (41) | Harder to change safely | Split into one function per action/secret kind (sizes in [Code structure §7](CODE_STRUCTURE.md#7-size-and-complexity-at-a-glance)) |
 | D2 | `kb_firewall` and `defense` import each other (normalizer, event log) | Package boundary is blurred | Move both to a small shared package |
 | D3 | 41% docstring coverage on public functions | Slower onboarding | Add docstrings to public API first |

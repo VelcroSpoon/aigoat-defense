@@ -1,19 +1,14 @@
 # Documentation
 
+**Authors:** Christopher Aguilar Mendez, Simon Grondin and Jeremiah Kisamba Mwamba, Bishop's University AI Cybersecurity
+Challenge 2026
+
 Start here. The AI Goat Firewall documentation is organized by what you need to do, following the
-[Diátaxis](https://diataxis.fr) framework: **tutorials** to learn, **how-to guides** to get a task
-done, **reference** to look something up, and **explanation** to understand why.
+[Diátaxis](https://diataxis.fr) framework: **how-to guides** to get a task done, **reference** to look
+something up, and **explanation** to understand why.
 
-New to the project? Read in this order: the [technical overview](../docs/ai-goat-firewall/TECHNICAL_OVERVIEW.md)
-(10 minutes), then the [architecture document](ARCHITECTURE.md), then the
-[code structure guide](CODE_STRUCTURE.md).
-
-## Tutorials (learn by doing)
-
-| Document | What you'll do |
-|---|---|
-| [10-minute live demo](../docs/ai-goat-firewall/DEMO.md) | Run all three attacks with each firewall off, then on |
-| [KB firewall demo](../docs/kb-firewall/DEMO.md) | The original single-entry knowledge-base poisoning attack, step by step |
+New to the project? Read in this order: the [architecture document](ARCHITECTURE.md), then the
+[code structure guide](CODE_STRUCTURE.md), then the [decision records](decisions/README.md).
 
 ## How-to guides (get a task done)
 
@@ -33,7 +28,6 @@ New to the project? Read in this order: the [technical overview](../docs/ai-goat
 |---|---|
 | [Action firewall](../docs/action-firewall.md) | Policy table, switches, results, limitations |
 | [Leak firewall](../docs/leak-firewall.md) | What counts as a secret, encodings handled, switches, limitations |
-| [KB firewall technical overview](../docs/kb-firewall/TECHNICAL_OVERVIEW.md) | Write gate, read gate, scanner, split payloads, admin API |
 | [Code structure](CODE_STRUCTURE.md) | Repository map, dependency rules, conventions, module sizes |
 | [Guardrails in AI Goat](../docs/guardrails.md) | Every upstream guardrail and what it checks (upstream document) |
 | `config/defense_profiles.yml` | Which controls run per surface and level |
@@ -43,7 +37,6 @@ New to the project? Read in this order: the [technical overview](../docs/ai-goat
 
 | Document | Question it answers |
 |---|---|
-| [Technical overview](../docs/ai-goat-firewall/TECHNICAL_OVERVIEW.md) | What problem does each layer solve, and how well? |
 | [Architecture (arc42)](ARCHITECTURE.md) | How is the system structured, deployed and run; what are its risks? |
 | [Architecture decisions](decisions/README.md) | Why enforce in code? Why noisy-OR? Why sentence-by-sentence streaming? |
 

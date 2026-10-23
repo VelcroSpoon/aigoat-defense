@@ -59,7 +59,7 @@ mcp:
   spawn_timeout: 15
   max_concurrent: 2
 
-# KB Firewall (docs/kb-firewall/TECHNICAL_OVERVIEW.md). Off by default so the labs stay vulnerable;
+# KB Firewall (documentation/ARCHITECTURE.md). Off by default so the labs stay vulnerable;
 # an admin can also switch it at runtime from /admin/kb-firewall.
 kb_firewall:
   enabled: false

@@ -6,12 +6,11 @@
 >
 > | Layer | Stops | Code | Docs |
 > |---|---|---|---|
-> | **KB firewall**: what goes in | Knowledge-base poisoning (indirect prompt injection through RAG), including instructions split across entries | [app/kb_firewall/](app/kb_firewall/) | [overview](docs/kb-firewall/TECHNICAL_OVERVIEW.md) |
+> | **KB firewall**: what goes in | Knowledge-base poisoning (indirect prompt injection through RAG), including instructions split across entries | [app/kb_firewall/](app/kb_firewall/) | [docs](documentation/README.md) |
 > | **Action firewall**: what it may do | Refunds, staff coupons, exports and order changes the logged-in user is not allowed (excessive agency) | [action_firewall.py](app/defense/controls/action_firewall.py) | [doc](docs/action-firewall.md) |
 > | **Leak firewall**: what comes out | Replies that reveal the system prompt's secrets (passphrases, credentials, config, other customers' records), even encoded | [leak_firewall.py](app/defense/controls/leak_firewall.py) | [doc](docs/leak-firewall.md) |
 >
-> - What it does and why: [docs/ai-goat-firewall/TECHNICAL_OVERVIEW.md](docs/ai-goat-firewall/TECHNICAL_OVERVIEW.md)
-> - 10-minute demo script: [docs/ai-goat-firewall/DEMO.md](docs/ai-goat-firewall/DEMO.md)
+> - Documentation (architecture, design decisions, code structure): [documentation/](documentation/README.md)
 > - Admin page `/admin/kb-firewall` (menu: *AI Goat Firewall*): a runtime switch per layer, one live log,
 >   the KB quarantine queue and a scanner sandbox
 > - Tests: `tests/test_kb_firewall.py`, `tests/test_action_firewall.py`, `tests/test_leak_firewall.py`
