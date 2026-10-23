@@ -308,7 +308,7 @@ flowchart LR
 
 | # | Item | Impact | Mitigation / next step |
 |---|---|---|---|
-| R1 | Test sets were written by the team that tuned the rules | Numbers are optimistic | Measure on a held-out set (the fresh KB set on branch `simon/both-firewalls`, not merged yet) and public sets |
+| R1 | Test sets were written by the team that tuned the rules | Numbers are optimistic | Measure on a held-out set (the fresh KB set, `eval/kb_firewall/fresh_dataset.py`) and public sets |
 | R2 | Patterns can be studied and evaded | Bypasses with effort | Decisions rest on facts; layers overlap; scanner is admin-only |
 | R3 | Paraphrased leaks and multi-message attacks | Not detected | Per-conversation state; meaning-based leak check |
 | R4 | Lab level resets when a lab page reloads (AI Goat UI) | A demo may silently run at Level 0 | Documented in the demo guide; candidate upstream fix |
