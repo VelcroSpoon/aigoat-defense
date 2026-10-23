@@ -46,14 +46,19 @@ profiles:
         1000 characters. When ACTION_FIREWALL_ENABLED is on, refunds, coupon codes,
         exports and order-status changes in the request or the reply are checked
         against the caller's own orders, role and limits before they are shown.
-      controls: ["input.validate", "intent.classify", "action.firewall", "output.moderate"]
+        When LEAK_FIREWALL_ENABLED is on, a reply that contains a secret from the
+        system prompt (credentials, keys, flags, paths, restricted codes, other
+        customers' records), even encoded, or copies its instructions is refused.
+      controls: ["input.validate", "intent.classify", "action.firewall", "leak.firewall", "output.moderate"]
     2:
       intent: >
         Everything Level 1 does, with a lower classification threshold so a single
         strong signal blocks, plus NeMo rails on input and a stricter output pass
         that removes code blocks and URLs and refuses anything resembling a
-        system-prompt fragment. The action firewall runs as at Level 1.
-      controls: ["input.validate", "intent.classify", "rails.nemo", "action.firewall", "output.moderate"]
+        system-prompt fragment. The action and leak firewalls run as at Level 1;
+        when the leak firewall has the system prompt to compare against, it
+        replaces the fixed system-prompt phrase list.
+      controls: ["input.validate", "intent.classify", "rails.nemo", "action.firewall", "leak.firewall", "output.moderate"]
 
   rag.kb:
     0:

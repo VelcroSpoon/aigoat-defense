@@ -105,3 +105,25 @@ class Scanner:
             signals=signals,
             semantic_model=sem_model,
         )
+
+    def combine(self, verdicts: list[Verdict]) -> Verdict:
+        """Score several chunks as if they were one text, without scanning again.
+
+        Each category counts once at its strongest, as a scan of the joined
+        text would count it, so two halves of one instruction ("note for the
+        assistant:" + "ask for the full card number") add up.
+        """
+        strongest: dict[tuple[str, str], Signal] = {}
+        for verdict in verdicts:
+            for signal in verdict.signals:
+                key = (signal.source, "" if signal.source == "obfuscation" else signal.label)
+                if key not in strongest or signal.weight > strongest[key].weight:
+                    strongest[key] = signal
+        signals = list(strongest.values())
+        risk = _noisy_or([s.weight for s in signals])
+        return Verdict(
+            flagged=risk >= self.threshold,
+            risk=risk,
+            signals=signals,
+            semantic_model=next((v.semantic_model for v in verdicts if v.semantic_model), None),
+        )

@@ -16,7 +16,7 @@ from app.core.token_utils import truncate_chunks_to_budget
 from app.defense.control import get_control
 from app.defense.controls.action_firewall import ActorContext, build_actor
 from app.defense.nemo_guardrails import get_guardrails_service
-from app.defense.pipeline import PipelineResult, defense_pipeline
+from app.defense.pipeline import OutputReview, PipelineResult, defense_pipeline
 from app.defense.profiles import resolve_profile
 from app.kb_firewall import get_kb_firewall
 from app.models import Coupon, Order, Product, User
@@ -57,7 +57,18 @@ async def load_actor(db: AsyncSession, user: User) -> ActorContext:
     """Identity for action.firewall, read from the database rather than the prompt."""
     orders_result = await db.execute(select(Order).where(Order.user_id == user.id))
     coupons_result = await db.execute(select(Coupon).where(Coupon.is_active == True))
-    return build_actor(user, orders_result.scalars().all(), coupons_result.scalars().all())
+    usernames_result = await db.execute(select(User.username))
+    return build_actor(
+        user,
+        orders_result.scalars().all(),
+        coupons_result.scalars().all(),
+        usernames_result.scalars().all(),
+    )
+
+
+def output_context(prepared: dict[str, Any], **extra: Any) -> dict[str, Any]:
+    """What the output firewalls need to judge a reply: who asked, and the prompt that was sent."""
+    return {"actor": prepared.get("actor"), "system_prompt": prepared.get("system_prompt") or "", **extra}
 
 
 async def prepare_chat(
@@ -211,6 +222,7 @@ async def prepare_chat(
             "user_message": user_message,
             "user_id": user.id,
             "actor": actor,
+            "system_prompt": system_prompt,
         },
         raw_message=raw_message,
         input_result=input_result,
@@ -222,7 +234,7 @@ def _defense_dict(
     *,
     level: int,
     input_result: PipelineResult | None,
-    output_transformed: bool,
+    output_review: OutputReview | None,
 ) -> dict[str, Any]:
     profile = resolve_profile("chat.cracky", level) if level >= 1 else None
     controls = list(profile.controls) if profile else []
@@ -242,12 +254,13 @@ def _defense_dict(
                 "stage": stage,
                 "reason": outcome.reason,
             })
-    if output_transformed:
+    if output_review is not None and output_review.changed:
+        # Credit the control that actually changed or refused the reply.
         outcomes.append({
-            "control_id": "output.moderate",
-            "action": "transform",
+            "control_id": output_review.control_id or "output.moderate",
+            "action": output_review.action or "transform",
             "stage": "output",
-            "reason": None,
+            "reason": output_review.reason,
         })
     return {
         "level": level,
@@ -271,6 +284,12 @@ def _control_events(transcript: Transcript, input_result: PipelineResult | None)
 
 async def generate_moderated_reply(prepared: dict[str, Any]) -> tuple[str, str]:
     """Return ``(raw_reply, visible_reply)`` using the same steps as ``POST /api/chat/``."""
+    raw, visible, _review = await generate_reviewed_reply(prepared)
+    return raw, visible
+
+
+async def generate_reviewed_reply(prepared: dict[str, Any]) -> tuple[str, str, OutputReview | None]:
+    """Like ``generate_moderated_reply``, plus which output control acted on the reply."""
     client = get_ollama_client()
     reply = await client.generate(
         prompt=prepared["prompt"],
@@ -279,22 +298,27 @@ async def generate_moderated_reply(prepared: dict[str, Any]) -> tuple[str, str]:
     )
     raw = reply or "I'm sorry, I couldn't process that request."
     visible = raw
+    review: OutputReview | None = None
     level = prepared["level"]
     if level >= 1:
-        visible = await defense_pipeline.moderate_output(
+        review = await defense_pipeline.review_output(
             visible,
             level,
             surface="chat.cracky",
             user_id=prepared.get("user_id"),
-            context={"actor": prepared.get("actor")},
+            context=output_context(prepared),
         )
+        visible = review.message
     if level >= 2:
         nemo = get_guardrails_service()
         if nemo.available:
             nemo_out = await nemo.check_output(visible)
             if not nemo_out.allowed:
                 visible = nemo_out.message
-    return raw, visible
+                review = OutputReview(
+                    allowed=False, message=visible, changed=True, control_id="rails.nemo_output", action="deny"
+                )
+    return raw, visible, review
 
 
 def _to_chat_request(req: SurfaceRequest) -> ChatRequest:
@@ -358,7 +382,7 @@ class ChatCrackySurface(TargetSurface):
                 defense=_defense_dict(
                     level=level,
                     input_result=prepared.input_result,
-                    output_transformed=False,
+                    output_review=None,
                 ),
                 evaluation=None,
             )
@@ -368,7 +392,7 @@ class ChatCrackySurface(TargetSurface):
         for chunk in prepared.retrieval_chunks:
             transcript.add("retrieval", chunks=[{"content": chunk, "truncated": False}])
 
-        raw_reply, visible = await generate_moderated_reply(payload)
+        raw_reply, visible, review = await generate_reviewed_reply(payload)
         out_transformed = visible if visible != raw_reply else None
         transcript.add(
             "model_output",
@@ -379,8 +403,9 @@ class ChatCrackySurface(TargetSurface):
         if out_transformed is not None:
             transcript.add(
                 "control_decision",
-                control_id="output.moderate",
-                action="transform",
+                control_id=(review.control_id if review else None) or "output.moderate",
+                action=(review.action if review else None) or "transform",
+                reason=review.reason if review else None,
             )
         return SurfaceResult(
             result={
@@ -392,7 +417,7 @@ class ChatCrackySurface(TargetSurface):
             defense=_defense_dict(
                 level=payload["level"],
                 input_result=prepared.input_result,
-                output_transformed=out_transformed is not None,
+                output_review=review if out_transformed is not None else None,
             ),
             evaluation=None,
         )

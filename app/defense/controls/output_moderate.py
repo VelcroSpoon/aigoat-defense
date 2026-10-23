@@ -17,7 +17,12 @@ class OutputModerateControl(DefenseControl):
     applies_to = (DefenseStage.OUTPUT,)
 
     async def _evaluate(self, decision: DefenseDecision) -> ControlOutcome:
-        moderated = _moderator.moderate(decision.payload, decision.level)
+        # leak.firewall sets this after comparing the reply with the real prompt.
+        moderated = _moderator.moderate(
+            decision.payload,
+            decision.level,
+            check_prompt_fragments=not decision.context.get("prompt_leak_checked"),
+        )
         if moderated != decision.payload:
             return ControlOutcome(
                 action=ControlAction.TRANSFORM,

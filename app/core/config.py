@@ -51,6 +51,7 @@ class DefenseConfig(BaseModel):
     profiles_path: str = "./config/defense_profiles.yml"
     action_firewall_enabled: bool = True
     action_firewall_audit_path: str = "./logs/action_firewall_audit.jsonl"
+    leak_firewall_enabled: bool = True
 
 
 class RagConfig(BaseModel):
@@ -189,9 +190,13 @@ def load_config(path: str | Path | None = None) -> Settings:
     ollama_url = os.environ.get("OLLAMA_BASE_URL")
     if ollama_url:
         settings.ollama.base_url = ollama_url
-    firewall = os.environ.get("ACTION_FIREWALL_ENABLED")
-    if firewall is not None:
-        settings.defense.action_firewall_enabled = firewall.strip().lower() in ("1", "true", "yes", "on")
+    for env, attr in (
+        ("ACTION_FIREWALL_ENABLED", "action_firewall_enabled"),
+        ("LEAK_FIREWALL_ENABLED", "leak_firewall_enabled"),
+    ):
+        value = os.environ.get(env)
+        if value is not None:
+            setattr(settings.defense, attr, value.strip().lower() in ("1", "true", "yes", "on"))
     return settings
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from collections.abc import AsyncIterator
 from typing import Annotated
 
@@ -25,7 +26,7 @@ from app.schemas.chat import (
 from app.services.ollama_client import get_ollama_client
 from app.surfaces import ensure_registered
 from app.surfaces.base import SurfaceRequest
-from app.surfaces.chat_cracky import prepare_chat
+from app.surfaces.chat_cracky import output_context, prepare_chat
 from app.surfaces.registry import get_surface
 
 logger = logging.getLogger(__name__)
@@ -227,20 +228,50 @@ async def chat_stream(
         return StreamingResponse(blocked_gen(), media_type="text/event-stream")
 
     client = get_ollama_client()
+    level = prepared["level"]
 
     async def token_gen():
         collected: list[str] = []
         gone: dict = {}
-        async for token in _stream_model_tokens(
+        # At Level 1 and 2 the reply is released a sentence at a time, and only
+        # after the output controls have checked everything up to it, so a
+        # refund claim or a leaked secret never reaches the screen. Level 0
+        # streams raw tokens.
+        shown = ""
+        checked = 0
+        stream = _stream_model_tokens(
             client,
             request,
             prepared["prompt"],
             prepared["options"],
             gone,
-        ):
-            collected.append(token)
-            data = json.dumps({"token": token, "done": False})
-            yield f"data: {data}\n\n"
+        )
+        try:
+            async for token in stream:
+                collected.append(token)
+                if level == 0:
+                    yield _sse({"token": token, "done": False})
+                    continue
+                text = "".join(collected)
+                cut = _release_point(text, checked)
+                if cut <= checked:
+                    continue
+                checked = cut
+                review = await defense_pipeline.review_output(
+                    text[:cut],
+                    level,
+                    user_id=prepared.get("user_id"),
+                    context=output_context(prepared, preview=True),
+                )
+                if not review.allowed:
+                    yield _sse({"replace": review.message, "done": True})
+                    return
+                for event in _update_events(shown, review.message):
+                    yield event
+                shown = review.message
+        finally:
+            # Stops the model as soon as a partial reply is refused.
+            await stream.aclose()
 
         if gone.get("client"):
             return
@@ -252,33 +283,60 @@ async def chat_stream(
             yield f"data: {data}\n\n"
             return
 
-        level = prepared["level"]
-        moderated = full_reply
-        replaced = False
-        if level >= 1:
-            moderated = await defense_pipeline.moderate_output(
-                full_reply,
-                level,
-                user_id=prepared.get("user_id"),
-                context={"actor": prepared.get("actor")},
-            )
-            if moderated != full_reply:
-                replaced = True
+        if level == 0:
+            yield _sse({"done": True})
+            return
+
+        moderated = await defense_pipeline.moderate_output(
+            full_reply,
+            level,
+            user_id=prepared.get("user_id"),
+            context=output_context(prepared),
+        )
         if level >= 2:
             nemo = get_guardrails_service()
             if nemo.available:
                 nemo_out = await nemo.check_output(moderated)
                 if not nemo_out.allowed:
                     moderated = nemo_out.message
-                    replaced = True
 
-        if replaced:
-            data = json.dumps({"replace": moderated, "done": True})
+        if moderated == shown:
+            yield _sse({"done": True})
+        elif moderated.startswith(shown):
+            yield _sse({"token": moderated[len(shown):], "done": False})
+            yield _sse({"done": True})
         else:
-            data = json.dumps({"done": True})
-        yield f"data: {data}\n\n"
+            yield _sse({"replace": moderated, "done": True})
 
     return StreamingResponse(token_gen(), media_type="text/event-stream")
+
+
+_SENTENCE_END = re.compile(r"[.!?…](?=\s)|\n")
+# Without a sentence end for this long, release up to the last space.
+_MAX_HELD = 400
+
+
+def _release_point(text: str, checked: int) -> int:
+    """End of the last complete sentence in ``text`` (0 if none yet)."""
+    ends = [m.end() for m in _SENTENCE_END.finditer(text, checked)]
+    if ends:
+        return ends[-1]
+    if len(text) - checked > _MAX_HELD and " " in text[checked:]:
+        return text.rindex(" ")
+    return checked
+
+
+def _update_events(shown: str, moderated: str) -> list[str]:
+    """Events that turn what the browser shows into ``moderated``."""
+    if moderated == shown:
+        return []
+    if moderated.startswith(shown):
+        return [_sse({"token": moderated[len(shown):], "done": False})]
+    return [_sse({"replace": moderated, "done": False})]
+
+
+def _sse(payload: dict) -> str:
+    return f"data: {json.dumps(payload)}\n\n"
 
 
 @router.get("/api/chat/defense-levels", response_model=DefenseLevelOut)

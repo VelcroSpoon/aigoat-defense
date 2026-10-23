@@ -574,7 +574,7 @@ const Header = () => {
                 </MenuItem>
                 <MenuItem onClick={() => handleProfileMenuClick('/admin/kb-firewall')} sx={{ color: 'text.primary', '&:hover': { bgcolor: (t) => t.palette.custom?.overlay?.active } }}>
                   <ListItemIcon><ShieldIcon sx={{ color: 'text.secondary' }} fontSize="small" /></ListItemIcon>
-                  <ListItemText>KB Firewall</ListItemText>
+                  <ListItemText>AI Goat Firewall</ListItemText>
                 </MenuItem>
                 <MenuItem onClick={() => handleProfileMenuClick('/inventory')} sx={{ color: 'text.primary', '&:hover': { bgcolor: (t) => t.palette.custom?.overlay?.active } }}>
                   <ListItemIcon><InventoryIcon sx={{ color: 'text.secondary' }} fontSize="small" /></ListItemIcon>

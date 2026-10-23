@@ -1,5 +1,8 @@
 # KB Firewall: 10-minute presentation and live demo
 
+> For the full three-layer demo (KB, action and leak firewalls) use
+> [docs/ai-goat-firewall/DEMO.md](../ai-goat-firewall/DEMO.md). This one covers the KB firewall alone.
+
 Goal: the judges see the attack work, see the firewall stop it, and see normal answers still work.
 The demo is the centerpiece; slides are only for minutes 0–2 and 8–10.
 
@@ -36,7 +39,7 @@ The demo is the centerpiece; slides are only for minutes 0–2 and 8–10.
 4. Delete the entry (as admin) so the second half starts clean.
 
 **4:00–7:00 · The defense (firewall ON)**
-1. Tab B: flip **Protection** on. Explain the three layers in one breath: write gate, read gate,
+1. Tab B: flip the **KB firewall** switch on. Explain the three layers in one breath: write gate, read gate,
    spotlighting.
 2. Tab A: try to edit the shared *Refund and Return Policy* → refused (only owners and staff edit).
 3. Tab A: add the same poisoned entry → it is **quarantined**; tab B shows it in the live log and the

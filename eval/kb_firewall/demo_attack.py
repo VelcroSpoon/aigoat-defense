@@ -91,8 +91,8 @@ def main() -> int:
         _say(f"4. Same question to Cracky (level {args.level})", _ask(alice, args.level))
 
         _say("5. Firewall log")
-        for e in admin.get("/api/kb-firewall/events").json()["events"]:
-            print(f"   {e['at']} {e['kind']:5} {e['action']:12} risk={e['risk']} {e.get('title')!r}")
+        for e in admin.get("/api/kb-firewall/events", params={"firewall": "kb"}).json()["events"]:
+            print(f"   {e['at']} {e.get('kind', ''):5} {e['action']:12} risk={e.get('risk')} {e.get('title')!r}")
     finally:
         for entry_id in created:
             admin.delete(f"/api/knowledge-base/{entry_id}/")

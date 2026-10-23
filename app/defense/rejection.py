@@ -13,6 +13,7 @@ REJECTION_TEMPLATES: dict[str, str] = {
     "resource_abuse": "That request would produce an excessively large response. Please ask about a specific product or narrow your question.",
     "action_blocked": "I can't do that. Refunds, coupons, data exports and order changes are checked against your account, and this one is not permitted. Nothing has been changed.",
     "action_needs_confirmation": "That action needs confirmation from a member of staff before anything happens. Nothing has been changed yet.",
+    "leak_blocked": "I can't share that. It includes internal configuration, credentials or other customers' details. I'm happy to help with AI Goat Shop products and your own orders.",
 }
 
 

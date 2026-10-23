@@ -9,6 +9,7 @@ from app.defense.control import get_control, register_control
 from app.defense.controls.action_firewall import ActionFirewallControl
 from app.defense.controls.input_validate import InputValidateControl
 from app.defense.controls.intent_classify import IntentClassifyControl
+from app.defense.controls.leak_firewall import LeakFirewallControl
 from app.defense.controls.mcp_description_scan import McpDescriptionScanControl
 from app.defense.controls.mcp_origin_pin import McpOriginPinControl
 from app.defense.controls.mcp_result_scan import McpResultScanControl
@@ -56,6 +57,7 @@ def ensure_registered() -> None:
     _register_if_missing(McpDescriptionScanControl())
     _register_if_missing(McpResultScanControl())
     _register_if_missing(ActionFirewallControl())
+    _register_if_missing(LeakFirewallControl())
 
 
 ensure_registered()

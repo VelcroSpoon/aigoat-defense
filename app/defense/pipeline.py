@@ -26,6 +26,24 @@ class PipelineResult:
     outcomes: tuple = ()
 
 
+@dataclass
+class OutputReview:
+    """What the output controls did to a reply.
+
+    ``allowed`` is False when a control refused the reply or sent it for
+    approval; ``message`` is then the refusal. ``control_id`` names the last
+    control that changed or refused it, so the defense panel credits the
+    right one.
+    """
+    allowed: bool
+    message: str
+    changed: bool
+    control_id: str | None = None
+    action: str | None = None
+    reason: str | None = None
+    outcomes: tuple = ()
+
+
 def _input_control_ids(profile) -> tuple[str, ...]:
     return tuple(
         cid for cid in profile.controls
@@ -108,30 +126,37 @@ class DefensePipeline:
             outcomes=chain.outcomes,
         )
 
-    async def moderate_output(
+    async def review_output(
         self,
         response: str,
         level: int,
         surface: str = "chat.cracky",
         user_id: int | None = None,
         context: dict[str, Any] | None = None,
-    ) -> str:
+    ) -> OutputReview:
+        """Run the output controls and say which one acted, not only the new text.
+
+        With ``context["preview"]`` set (a partial reply checked while it
+        streams), only a refusal is logged; the final full check logs the rest.
+        """
         if level == 0:
-            return response
+            return OutputReview(allowed=True, message=response, changed=False)
         profile = resolve_profile(surface, level)
         decision = DefenseDecision(
             surface=surface,
             stage=DefenseStage.OUTPUT,
             payload=response,
             level=level,
-            context=context or {},
+            context=dict(context or {}),
             user_id=user_id,
         )
         chain = await run_chain(_output_control_ids(profile), decision)
+        refused = chain.final.action in (ControlAction.DENY, ControlAction.REQUIRE_APPROVAL)
         changed = chain.final.payload != response or any(
             outcome.action != ControlAction.ALLOW for outcome in chain.outcomes
         )
-        if changed:
+        acted = next((o for o in reversed(chain.outcomes) if o.action != ControlAction.ALLOW), None)
+        if changed and (refused or not decision.context.get("preview")):
             action = "blocked" if chain.final.action == ControlAction.DENY else "transformed"
             await self.telemetry.log(
                 user_id=decision.user_id,
@@ -141,7 +166,26 @@ class DefensePipeline:
                 action=action,
                 reason=chain.final.reason,
             )
-        return chain.final.payload
+        return OutputReview(
+            allowed=not refused,
+            message=chain.final.payload,
+            changed=changed,
+            control_id=acted.control_id if acted else None,
+            action=acted.action.value if acted else None,
+            reason=acted.reason if acted else None,
+            outcomes=chain.outcomes,
+        )
+
+    async def moderate_output(
+        self,
+        response: str,
+        level: int,
+        surface: str = "chat.cracky",
+        user_id: int | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> str:
+        review = await self.review_output(response, level, surface, user_id=user_id, context=context)
+        return review.message
 
 
 defense_pipeline = DefensePipeline()

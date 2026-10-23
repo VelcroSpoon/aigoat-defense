@@ -1,20 +1,30 @@
 # AIGoat (AI Goat): Open Source AI Security Playground for LLM, Agentic AI, and MCP Red Teaming
 
-> **This fork adds KB Firewall**, our entry for the Bishop's University AI Cybersecurity Challenge 2026:
-> a write-time and read-time firewall that stops knowledge-base poisoning (indirect prompt injection
-> through RAG) from reaching the chatbot, in five languages and against common obfuscation.
+> **This fork adds AI Goat Firewall**, our entry for the Bishop's University AI Cybersecurity Challenge
+> 2026: three layers around the Cracky chatbot, each checked in code against facts the model cannot
+> change, in five languages and against common obfuscation.
 >
-> - What it does and why: [docs/kb-firewall/TECHNICAL_OVERVIEW.md](docs/kb-firewall/TECHNICAL_OVERVIEW.md)
-> - Live demo script: [docs/kb-firewall/DEMO.md](docs/kb-firewall/DEMO.md)
-> - Code: [app/kb_firewall/](app/kb_firewall/) · admin page `/admin/kb-firewall` · tests `tests/test_kb_firewall.py`
+> | Layer | Stops | Code | Docs |
+> |---|---|---|---|
+> | **KB firewall**: what goes in | Knowledge-base poisoning (indirect prompt injection through RAG), including instructions split across entries | [app/kb_firewall/](app/kb_firewall/) | [overview](docs/kb-firewall/TECHNICAL_OVERVIEW.md) |
+> | **Action firewall**: what it may do | Refunds, staff coupons, exports and order changes the logged-in user is not allowed (excessive agency) | [action_firewall.py](app/defense/controls/action_firewall.py) | [doc](docs/action-firewall.md) |
+> | **Leak firewall**: what comes out | Replies that reveal the system prompt's secrets (passphrases, credentials, config, other customers' records), even encoded | [leak_firewall.py](app/defense/controls/leak_firewall.py) | [doc](docs/leak-firewall.md) |
+>
+> - What it does and why: [docs/ai-goat-firewall/TECHNICAL_OVERVIEW.md](docs/ai-goat-firewall/TECHNICAL_OVERVIEW.md)
+> - 10-minute demo script: [docs/ai-goat-firewall/DEMO.md](docs/ai-goat-firewall/DEMO.md)
+> - Admin page `/admin/kb-firewall` (menu: *AI Goat Firewall*): a runtime switch per layer, one live log,
+>   the KB quarantine queue and a scanner sandbox
+> - Tests: `tests/test_kb_firewall.py`, `tests/test_action_firewall.py`, `tests/test_leak_firewall.py`
 >
 > Try it after `./scripts/start.sh`:
 > ```bash
-> python -m eval.kb_firewall.run_benchmark   # old filter vs KB Firewall on 65 labelled entries
-> python -m eval.kb_firewall.demo_attack     # live attack with the firewall off, then on
+> python -m eval.firewall.run_benchmark      # before vs after for all three layers, offline
+> python -m eval.kb_firewall.run_benchmark   # old KB filter vs KB firewall on 65 labelled entries
+> python -m eval.firewall.demo_attacks       # three live attacks on Mistral, each layer off then on
 > ```
-> The firewall is off by default so the original labs stay vulnerable; switch it on from the admin page
-> or set `kb_firewall.enabled: true` in `config/config.yml`. The upstream project's README continues below.
+> Level 0 never runs the chat firewalls, and the KB firewall is off by default, so the original labs
+> stay vulnerable. The action and leak firewalls run at Levels 1 and 2 (`ACTION_FIREWALL_ENABLED`,
+> `LEAK_FIREWALL_ENABLED`). The upstream project's README continues below.
 
 <p align="center">
   <img src="media/images/logo.jpg" alt="AIGoat (AI Goat) logo: open source AI security playground" width="200"/>

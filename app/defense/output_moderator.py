@@ -23,7 +23,7 @@ MAX_OUTPUT_LENGTH_L1 = 1000
 
 
 class OutputModerator:
-    def moderate(self, response: str, level: int) -> str:
+    def moderate(self, response: str, level: int, check_prompt_fragments: bool = True) -> str:
         if level == 0:
             return response
 
@@ -42,7 +42,7 @@ class OutputModerator:
             result = URL_PATTERN.sub("", result)
             result = re.sub(r"\s+", " ", result).strip()
             result_lower = result.lower()
-            for fragment in SYSTEM_PROMPT_FRAGMENTS:
+            for fragment in SYSTEM_PROMPT_FRAGMENTS if check_prompt_fragments else ():
                 if fragment in result_lower:
                     return "I'm sorry, I can only help with AI Goat Shop products and orders."
 
